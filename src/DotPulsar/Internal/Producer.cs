@@ -17,6 +17,7 @@ namespace DotPulsar.Internal;
 using DotPulsar.Abstractions;
 using DotPulsar.Exceptions;
 using DotPulsar.Internal.Abstractions;
+using DotPulsar.Internal.Encryption;
 using DotPulsar.Internal.Extensions;
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -159,8 +160,10 @@ public sealed class Producer<TMessage> : IProducer<TMessage>, IRegisterEvent
         var producerName = _options.ProducerName;
         var schema = _options.Schema;
         var producerAccessMode = (PulsarApi.ProducerAccessMode) _options.ProducerAccessMode;
+        var messageCrypto = GetMessageCrypto(_options.EncryptionKeys);
+        var cryptoFailureAction = _options.CryptoFailureAction;
         var producerProperties = _options.ProducerProperties;
-        var factory = new ProducerChannelFactory(correlationId, _processManager, _connectionPool, topic, producerName, producerAccessMode, schema.SchemaInfo, _compressorFactory, producerProperties);
+        var factory = new ProducerChannelFactory(correlationId, _processManager, _connectionPool, topic, producerName, producerAccessMode, schema.SchemaInfo, _compressorFactory, messageCrypto, cryptoFailureAction, producerProperties);
         var stateManager = CreateStateManager();
         var initialChannel = new NotReadyChannel<TMessage>();
         var executor = new Executor(correlationId, _processManager, _exceptionHandler);
@@ -169,6 +172,14 @@ public sealed class Producer<TMessage> : IProducer<TMessage>, IRegisterEvent
         _processManager.Add(process);
         process.Start();
         return producer;
+    }
+
+    private IMessageCrypto? GetMessageCrypto(List<string> encryptionKeys)
+    {
+        if (encryptionKeys.Count == 0)
+            return null;
+
+        return new MessageCrypto();
     }
 
     public bool IsFinalState()

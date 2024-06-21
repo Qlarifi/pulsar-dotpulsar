@@ -16,12 +16,14 @@ namespace DotPulsar.Internal;
 
 using DotPulsar.Abstractions;
 using DotPulsar.Exceptions;
+using DotPulsar.Internal.Encryption;
 
 public sealed class ProducerBuilder<TMessage> : IProducerBuilder<TMessage>
 {
     private readonly IPulsarClient _pulsarClient;
     private readonly ISchema<TMessage> _schema;
     private readonly Dictionary<string, string> _producerProperties;
+    private readonly List<string> _encryptionKeys = [];
     private string? _producerName;
     private ProducerAccessMode _producerAccessMode;
     private bool _attachTraceInfoToMessages;
@@ -31,6 +33,7 @@ public sealed class ProducerBuilder<TMessage> : IProducerBuilder<TMessage>
     private IHandleStateChanged<ProducerStateChanged>? _stateChangedHandler;
     private IMessageRouter? _messageRouter;
     private uint _maxPendingMessages;
+    private ProducerCryptoFailureAction _producerCryptoFailureAction;
 
     public ProducerBuilder(IPulsarClient pulsarClient, ISchema<TMessage> schema)
     {
@@ -42,6 +45,8 @@ public sealed class ProducerBuilder<TMessage> : IProducerBuilder<TMessage>
         _maxPendingMessages = 500;
         _producerAccessMode = ProducerOptions<TMessage>.DefaultProducerAccessMode;
         _producerProperties = [];
+        _encryptionKeys = ProducerOptions<TMessage>.DefaultEncryptionKeys;
+        _producerCryptoFailureAction = ProducerOptions<TMessage>.DefaultCryptoFailureAction;
     }
 
     public IProducerBuilder<TMessage> AttachTraceInfoToMessages(bool attachTraceInfoToMessages)
@@ -65,6 +70,18 @@ public sealed class ProducerBuilder<TMessage> : IProducerBuilder<TMessage>
     public IProducerBuilder<TMessage> ProducerAccessMode(ProducerAccessMode producerAccessMode)
     {
         _producerAccessMode = producerAccessMode;
+        return this;
+    }
+
+    public IProducerBuilder<TMessage> AddEncryptionKey(string keyName)
+    {
+        _encryptionKeys.Add(keyName);
+        return this;
+    }
+
+    public IProducerBuilder<TMessage> CryptoFailureAction(ProducerCryptoFailureAction producerCryptoFailureAction)
+    {
+        _producerCryptoFailureAction = producerCryptoFailureAction;
         return this;
     }
 
@@ -121,7 +138,9 @@ public sealed class ProducerBuilder<TMessage> : IProducerBuilder<TMessage>
             ProducerName = _producerName,
             StateChangedHandler = _stateChangedHandler,
             MaxPendingMessages = _maxPendingMessages,
-            ProducerProperties = _producerProperties
+            ProducerProperties = _producerProperties,
+            EncryptionKeys = _encryptionKeys,
+            CryptoFailureAction = _producerCryptoFailureAction
         };
 
         if (_messageRouter is not null)

@@ -15,6 +15,7 @@
 namespace DotPulsar;
 
 using DotPulsar.Abstractions;
+using DotPulsar.Internal.Encryption;
 
 /// <summary>
 /// The producer building options.
@@ -37,6 +38,16 @@ public sealed class ProducerOptions<TMessage>
     public static readonly ProducerAccessMode DefaultProducerAccessMode = ProducerAccessMode.Shared;
 
     /// <summary>
+    /// The default encryption keys.
+    /// </summary>
+    public static readonly List<string> DefaultEncryptionKeys = new();
+
+    /// <summary>
+    /// The default action to take when message encryption fails.
+    /// </summary>
+    public static readonly ProducerCryptoFailureAction DefaultCryptoFailureAction = ProducerCryptoFailureAction.Fail;
+
+    /// <summary>
     /// Initializes a new instance using the specified topic.
     /// </summary>
     public ProducerOptions(string topic, ISchema<TMessage> schema)
@@ -48,6 +59,8 @@ public sealed class ProducerOptions<TMessage>
         Topic = topic;
         Schema = schema;
         MessageRouter = new RoundRobinPartitionRouter();
+        EncryptionKeys = DefaultEncryptionKeys;
+        CryptoFailureAction = DefaultCryptoFailureAction;
         ProducerProperties = [];
     }
 
@@ -55,6 +68,16 @@ public sealed class ProducerOptions<TMessage>
     /// Whether to attach the sending trace's parent and state to the outgoing messages metadata. The default is 'false'.
     /// </summary>
     public bool AttachTraceInfoToMessages { get; set; }
+
+    /// <summary>
+    /// Set the encryption keys.
+    /// </summary>
+    public List<string> EncryptionKeys { get; set; }
+
+    /// <summary>
+    /// Set the action to take when a crypto operation fails. The default is 'Fail'.
+    /// </summary>
+    public ProducerCryptoFailureAction CryptoFailureAction { get; set; }
 
     /// <summary>
     /// Set the compression type. The default is 'None'.

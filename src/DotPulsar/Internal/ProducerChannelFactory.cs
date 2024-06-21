@@ -15,6 +15,7 @@
 namespace DotPulsar.Internal;
 
 using DotPulsar.Internal.Abstractions;
+using DotPulsar.Internal.Encryption;
 using DotPulsar.Internal.Extensions;
 using DotPulsar.Internal.PulsarApi;
 
@@ -25,11 +26,12 @@ public sealed class ProducerChannelFactory : IProducerChannelFactory
     private readonly IConnectionPool _connectionPool;
     private readonly CommandProducer _commandProducer;
     private readonly ICompressorFactory? _compressorFactory;
+    private readonly IMessageCrypto? _messageCrypto;
+    private readonly ProducerCryptoFailureAction _cryptoFailureAction;
     private readonly Schema? _schema;
     private ulong? _topicEpoch;
 
-    public ProducerChannelFactory(
-        Guid correlationId,
+    public ProducerChannelFactory(Guid correlationId,
         IRegisterEvent eventRegister,
         IConnectionPool connectionPool,
         string topic,
@@ -37,6 +39,8 @@ public sealed class ProducerChannelFactory : IProducerChannelFactory
         ProducerAccessMode producerAccessMode,
         SchemaInfo schemaInfo,
         ICompressorFactory? compressorFactory,
+        IMessageCrypto? messageCrypto,
+        ProducerCryptoFailureAction cryptoFailureAction,
         Dictionary<string, string>? properties)
     {
         _correlationId = correlationId;
@@ -54,6 +58,8 @@ public sealed class ProducerChannelFactory : IProducerChannelFactory
             _commandProducer.Metadatas.AddRange(properties.Select(x => new KeyValue { Key = x.Key, Value = x.Value }));
 
         _compressorFactory = compressorFactory;
+        _messageCrypto = messageCrypto;
+        _cryptoFailureAction = cryptoFailureAction;
         _schema = schemaInfo.PulsarSchema;
     }
 
@@ -73,7 +79,7 @@ public sealed class ProducerChannelFactory : IProducerChannelFactory
         var response = await connection.Send(_commandProducer, channel, cancellationToken).ConfigureAwait(false);
         _topicEpoch = response.TopicEpoch;
         var schemaVersion = await GetSchemaVersion(connection, cancellationToken).ConfigureAwait(false);
-        return new ProducerChannel(response.ProducerId, response.ProducerName, connection, _compressorFactory, schemaVersion);
+        return new ProducerChannel(response.ProducerId, response.ProducerName, connection, _compressorFactory, _messageCrypto, _cryptoFailureAction, schemaVersion);
     }
 
     private async ValueTask<byte[]?> GetSchemaVersion(IConnection connection, CancellationToken cancellationToken)

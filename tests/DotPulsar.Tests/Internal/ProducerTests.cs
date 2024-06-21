@@ -16,6 +16,7 @@ namespace DotPulsar.Tests.Internal;
 
 using DotPulsar.Abstractions;
 using DotPulsar.Extensions;
+using DotPulsar.Internal.Encryption;
 using Xunit.Abstractions;
 
 [Collection("Integration"), Trait("Category", "Integration")]
@@ -361,6 +362,66 @@ public sealed class ProducerTests : IDisposable
         exception.Should().BeNull();
     }
 
+    [Fact]
+    public async Task Encryption_WhenEncryptionKeysDefined_ShouldBeAbleToSend()
+    {
+        //Arrange
+        const int numberOfMessages = 10;
+        var topicName = await _fixture.CreateTopic(_cts.Token);
+
+        await using var client = CreateClient();
+        await using var consumer = CreateConsumer(client, topicName);
+        await using var producer = CreateProducerWithEncryption(client, topicName);
+
+        //Act
+        var produced = await ProduceMessages(producer, numberOfMessages, _cts.Token);
+        var consumed = await ConsumeMessages(consumer, numberOfMessages, _cts.Token);
+
+        //Assert
+        produced.First().EntryId.Should().Be(0);
+        consumed.First().EntryId.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Encryption_GivenDefaultCryptoFailureAction_WhenEncryptionFails_ShouldFail()
+    {
+        //Arrange
+        const int numberOfMessages = 10;
+        var topicName = await _fixture.CreateTopic(_cts.Token);
+
+        await using var client = CreateClient();
+        await using var consumer = CreateConsumer(client, topicName);
+        await using var producer = CreateProducerWithEncryption(client, topicName);
+
+        //Act
+        var produced = await ProduceMessages(producer, numberOfMessages, _cts.Token);
+        var consumed = await ConsumeMessages(consumer, numberOfMessages, _cts.Token);
+
+        //Assert
+        produced.First().EntryId.Should().Be(0);
+        consumed.First().EntryId.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Encryption_GivenCryptoFailureActionSend_WhenEncryptionFails_ShouldSend()
+    {
+        //Arrange
+        const int numberOfMessages = 10;
+        var topicName = await _fixture.CreateTopic(_cts.Token);
+
+        await using var client = CreateClient();
+        await using var consumer = CreateConsumer(client, topicName);
+        await using var producer = CreateProducerWithEncryption(client, topicName, ProducerCryptoFailureAction.Send);
+
+        //Act
+        var produced = await ProduceMessages(producer, numberOfMessages, _cts.Token);
+        var consumed = await ConsumeMessages(consumer, numberOfMessages, _cts.Token);
+
+        //Assert
+        produced.First().EntryId.Should().Be(0);
+        consumed.First().EntryId.Should().Be(0);
+    }
+
     private static async Task<IEnumerable<MessageId>> ProduceMessages(IProducer<string> producer, int numberOfMessages, CancellationToken ct)
     {
         var messageIds = new MessageId[numberOfMessages];
@@ -403,6 +464,18 @@ public sealed class ProducerTests : IDisposable
         .ProducerAccessMode(producerAccessMode)
         .StateChangedHandler(_testOutputHelper.Log)
         .Create();
+
+    private IProducer<string> CreateProducerWithEncryption(
+        IPulsarClient pulsarClient,
+        string topicName,
+        ProducerCryptoFailureAction cryptoFailureAction = ProducerCryptoFailureAction.Fail)
+        => pulsarClient.NewProducer(Schema.String)
+            .Topic(topicName)
+            .AddEncryptionKey("pulsar/asymmetric-encryption-key1")
+            .AddEncryptionKey("pulsar/asymmetric-encryption-key2")
+            .CryptoFailureAction(cryptoFailureAction)
+            .StateChangedHandler(_testOutputHelper.Log)
+            .Create();
 
     private IConsumer<string> CreateConsumer(IPulsarClient pulsarClient, string topicName)
         => pulsarClient.NewConsumer(Schema.String)

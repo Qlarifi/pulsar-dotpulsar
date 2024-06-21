@@ -14,7 +14,9 @@
 
 namespace DotPulsar.Internal;
 
+using DotPulsar.Exceptions;
 using DotPulsar.Internal.Abstractions;
+using DotPulsar.Internal.Encryption;
 using DotPulsar.Internal.PulsarApi;
 using Microsoft.Extensions.ObjectPool;
 using System.Buffers;
@@ -26,13 +28,16 @@ public sealed class ProducerChannel : IProducerChannel
     private readonly string _name;
     private readonly IConnection _connection;
     private readonly ICompressorFactory? _compressorFactory;
+    private readonly IMessageCrypto? _messageCrypto;
+    private readonly ProducerCryptoFailureAction _cryptoFailureAction;
     private readonly byte[]? _schemaVersion;
 
-    public ProducerChannel(
-        ulong id,
+    public ProducerChannel(ulong id,
         string name,
         IConnection connection,
         ICompressorFactory? compressorFactory,
+        IMessageCrypto? messageCrypto,
+        ProducerCryptoFailureAction cryptoFailureAction,
         byte[]? schemaVersion)
     {
         var sendPackagePolicy = new DefaultPooledObjectPolicy<SendPackage>();
@@ -41,6 +46,8 @@ public sealed class ProducerChannel : IProducerChannel
         _name = name;
         _connection = connection;
         _compressorFactory = compressorFactory;
+        _messageCrypto = messageCrypto;
+        _cryptoFailureAction = cryptoFailureAction;
         _schemaVersion = schemaVersion;
     }
 
@@ -90,6 +97,31 @@ public sealed class ProducerChannel : IProducerChannel
                 using var compressor = _compressorFactory.Create();
                 sendPackage.Payload = compressor.Compress(payload);
                 resetCompression = true;
+            }
+
+            if (_messageCrypto is not null)
+            {
+                try
+                {
+                    var (encryptedPayload, nonce, encryptedDataKeys) = _messageCrypto.Encrypt(sendPackage.Payload);
+
+                    sendPackage.Payload = encryptedPayload;
+                    sendPackage.Metadata.EncryptionParam = nonce;
+                    sendPackage.Metadata.EncryptionKeys.AddRange(encryptedDataKeys);
+                }
+                catch (CryptoException cryptoException)
+                {
+                    if (_cryptoFailureAction == ProducerCryptoFailureAction.Send)
+                    {
+                        sendPackage.Payload = payload;
+                        sendPackage.Metadata.EncryptionParam = null;
+                        sendPackage.Metadata.EncryptionKeys.Clear();
+                    }
+                    else
+                    {
+                        throw;
+                    }
+                }
             }
 
             await _connection.Send(sendPackage, responseTcs, cancellationToken).ConfigureAwait(false);
