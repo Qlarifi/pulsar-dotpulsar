@@ -15,7 +15,6 @@
 namespace DotPulsar;
 
 using DotPulsar.Abstractions;
-using DotPulsar.Internal.Encryption;
 
 /// <summary>
 /// The producer building options.
@@ -60,6 +59,7 @@ public sealed class ProducerOptions<TMessage>
         Schema = schema;
         MessageRouter = new RoundRobinPartitionRouter();
         EncryptionKeys = DefaultEncryptionKeys;
+        DataKeyEncryptor = null;
         CryptoFailureAction = DefaultCryptoFailureAction;
         ProducerProperties = [];
     }
@@ -73,6 +73,11 @@ public sealed class ProducerOptions<TMessage>
     /// Set the encryption keys.
     /// </summary>
     public List<string> EncryptionKeys { get; set; }
+
+    /// <summary>
+    /// Set the data encryptor.
+    /// </summary>
+    public IDataKeyEncryptor? DataKeyEncryptor { get; set; }
 
     /// <summary>
     /// Set the action to take when a crypto operation fails. The default is 'Fail'.

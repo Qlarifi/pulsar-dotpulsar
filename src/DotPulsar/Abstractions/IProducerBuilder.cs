@@ -14,8 +14,6 @@
 
 namespace DotPulsar.Abstractions;
 
-using DotPulsar.Internal.Encryption;
-
 /// <summary>
 /// A producer building abstraction.
 /// </summary>
@@ -46,6 +44,11 @@ public interface IProducerBuilder<TMessage>
     /// Add an encryption key name used to encrypt the data key.
     /// </summary>
     IProducerBuilder<TMessage> AddEncryptionKey(string keyName);
+
+    /// <summary>
+    /// Set the encryptor used to encrypt the encryption algorithm data key.
+    /// </summary>
+    IProducerBuilder<TMessage> DataKeyEncryptor(IDataKeyEncryptor dataKeyEncryptor);
 
     /// <summary>
     /// Set the action that the producer takes when a message fails to be encrypted. The default is 'Fail'.

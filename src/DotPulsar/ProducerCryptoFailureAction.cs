@@ -12,7 +12,7 @@
  * limitations under the License.
  */
 
-namespace DotPulsar.Internal.Encryption;
+namespace DotPulsar;
 
 /// <summary>
 /// Possible actions that the producer can take when a message fails to be encrypted.

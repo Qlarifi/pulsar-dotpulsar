@@ -160,7 +160,7 @@ public sealed class Producer<TMessage> : IProducer<TMessage>, IRegisterEvent
         var producerName = _options.ProducerName;
         var schema = _options.Schema;
         var producerAccessMode = (PulsarApi.ProducerAccessMode) _options.ProducerAccessMode;
-        var messageCrypto = GetMessageCrypto(_options.EncryptionKeys);
+        var messageCrypto = GetMessageCrypto(_options.EncryptionKeys, _options.DataKeyEncryptor);
         var cryptoFailureAction = _options.CryptoFailureAction;
         var producerProperties = _options.ProducerProperties;
         var factory = new ProducerChannelFactory(correlationId, _processManager, _connectionPool, topic, producerName, producerAccessMode, schema.SchemaInfo, _compressorFactory, messageCrypto, cryptoFailureAction, producerProperties);
@@ -174,12 +174,21 @@ public sealed class Producer<TMessage> : IProducer<TMessage>, IRegisterEvent
         return producer;
     }
 
-    private IMessageCrypto? GetMessageCrypto(List<string> encryptionKeys)
+    private IMessageCrypto? GetMessageCrypto(List<string> encryptionKeys, IDataKeyEncryptor? dataKeyEncryptor)
     {
-        if (encryptionKeys.Count == 0)
+#if NETSTANDARD2_0
+        return null;
+#else
+        if (encryptionKeys.Count == 0 || dataKeyEncryptor == null)
             return null;
 
-        return new MessageCrypto();
+        // var nonceProvider = new LocalNonceProvider();
+        // var dataKeyProvider = new LocalDataKeyProvider();
+        // var dataKeyEncryptor = new LocalDataKeyEncryptor();
+
+        var dataKeyManager = new DataKeyManager(dataKeyEncryptor);
+        return new MessageCrypto(dataKeyManager, encryptionKeys);
+#endif
     }
 
     public bool IsFinalState()

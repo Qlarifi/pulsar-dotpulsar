@@ -16,7 +16,7 @@ namespace DotPulsar.Tests.Internal;
 
 using DotPulsar.Abstractions;
 using DotPulsar.Extensions;
-using DotPulsar.Internal.Encryption;
+using DotPulsar.Tests.Internal.Encryption;
 using Xunit.Abstractions;
 
 [Collection("Integration"), Trait("Category", "Integration")]
@@ -473,6 +473,7 @@ public sealed class ProducerTests : IDisposable
             .Topic(topicName)
             .AddEncryptionKey("pulsar/asymmetric-encryption-key1")
             .AddEncryptionKey("pulsar/asymmetric-encryption-key2")
+            .DataKeyEncryptor(new LocalDataKeyEncryptor())
             .CryptoFailureAction(cryptoFailureAction)
             .StateChangedHandler(_testOutputHelper.Log)
             .Create();

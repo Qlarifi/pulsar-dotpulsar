@@ -16,7 +16,6 @@ namespace DotPulsar.Internal;
 
 using DotPulsar.Abstractions;
 using DotPulsar.Exceptions;
-using DotPulsar.Internal.Encryption;
 
 public sealed class ProducerBuilder<TMessage> : IProducerBuilder<TMessage>
 {
@@ -33,6 +32,7 @@ public sealed class ProducerBuilder<TMessage> : IProducerBuilder<TMessage>
     private IHandleStateChanged<ProducerStateChanged>? _stateChangedHandler;
     private IMessageRouter? _messageRouter;
     private uint _maxPendingMessages;
+    private IDataKeyEncryptor? _dataKeyEncryptor;
     private ProducerCryptoFailureAction _producerCryptoFailureAction;
 
     public ProducerBuilder(IPulsarClient pulsarClient, ISchema<TMessage> schema)
@@ -46,6 +46,7 @@ public sealed class ProducerBuilder<TMessage> : IProducerBuilder<TMessage>
         _producerAccessMode = ProducerOptions<TMessage>.DefaultProducerAccessMode;
         _producerProperties = [];
         _encryptionKeys = ProducerOptions<TMessage>.DefaultEncryptionKeys;
+        _dataKeyEncryptor = null;
         _producerCryptoFailureAction = ProducerOptions<TMessage>.DefaultCryptoFailureAction;
     }
 
@@ -76,6 +77,12 @@ public sealed class ProducerBuilder<TMessage> : IProducerBuilder<TMessage>
     public IProducerBuilder<TMessage> AddEncryptionKey(string keyName)
     {
         _encryptionKeys.Add(keyName);
+        return this;
+    }
+
+    public IProducerBuilder<TMessage> DataKeyEncryptor(IDataKeyEncryptor dataKeyEncryptor)
+    {
+        _dataKeyEncryptor = dataKeyEncryptor;
         return this;
     }
 
@@ -140,6 +147,7 @@ public sealed class ProducerBuilder<TMessage> : IProducerBuilder<TMessage>
             MaxPendingMessages = _maxPendingMessages,
             ProducerProperties = _producerProperties,
             EncryptionKeys = _encryptionKeys,
+            DataKeyEncryptor = _dataKeyEncryptor,
             CryptoFailureAction = _producerCryptoFailureAction
         };
 

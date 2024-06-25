@@ -16,7 +16,6 @@ namespace DotPulsar.Internal;
 
 using DotPulsar.Exceptions;
 using DotPulsar.Internal.Abstractions;
-using DotPulsar.Internal.Encryption;
 using DotPulsar.Internal.PulsarApi;
 using Microsoft.Extensions.ObjectPool;
 using System.Buffers;
@@ -103,13 +102,13 @@ public sealed class ProducerChannel : IProducerChannel
             {
                 try
                 {
-                    var (encryptedPayload, nonce, encryptedDataKeys) = _messageCrypto.Encrypt(sendPackage.Payload);
+                    var (encryptedPayload, nonce, encryptedDataKeys) = await _messageCrypto.Encrypt(sendPackage.Payload);
 
                     sendPackage.Payload = encryptedPayload;
                     sendPackage.Metadata.EncryptionParam = nonce;
                     sendPackage.Metadata.EncryptionKeys.AddRange(encryptedDataKeys);
                 }
-                catch (CryptoException cryptoException)
+                catch (CryptoException)
                 {
                     if (_cryptoFailureAction == ProducerCryptoFailureAction.Send)
                     {
